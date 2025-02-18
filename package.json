@@ -1,0 +1,29 @@
+{
+  "name": "backend-challenge",
+  "version": "1.0.0",
+  "description": "Astra Backend challenge",
+  "scripts": {
+    "dev": "nodemon src/index.ts",
+    "lint": "eslint . --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^1.1.10",
+    "@anthropic-ai/sdk": "^0.36.3",
+    "ai": "^4.1.36",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.8.0",
+    "@typescript-eslint/eslint-plugin": "^6.7.3",
+    "@typescript-eslint/parser": "^6.7.3",
+    "eslint": "^8.50.0",
+    "nodemon": "^3.0.1",
+    "prettier": "^3.0.3",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.2"
+  }
+}
