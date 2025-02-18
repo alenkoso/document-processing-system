@@ -55,3 +55,7 @@ app.post("/api/chat", async (req, res) => {
 app.listen(port, () => {
 	console.log(`Server running on port ${port}`);
 });
+
+// curl -X POST http://localhost:3000/api/chat \
+// -H "Content-Type: application/json" \
+// -d '{"prompt": "What happens in the Flourish and Blotts scene in Harry Potter?"}'
