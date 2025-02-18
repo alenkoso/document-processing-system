@@ -15,31 +15,41 @@ const openai = createOpenAI({
 	apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Did the API key load?
+console.log('API Key loaded:', process.env.OPENAI_API_KEY ? 'Yes' : 'No');
+
 const anthropic = new Anthropic({
 	apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
 app.post("/api/chat", async (req, res) => {
-	// TODO: implement the endpoint
+	try {
+		const { prompt = "What is the capital of the moon?" } = req.body;
 
-	const result = await generateText({
-		model: openai("gpt-4o-mini"),
-		prompt: "What is the capital of the moon?",
-	});
+		const result = await generateText({
+			model: openai("gpt-4o-mini"),
+			prompt,
+			maxTokens: 500,
+		});
 
-	const anthropicResult = await anthropic.messages.create({
-		model: "claude-3-sonnet-20240229",
-		messages: [{ 
-			role: "user", 
-			content: "What is the capital of the moon?" 
-		}],
-		max_tokens: 100,
-	});
+		res.json({
+			answer: result.text
+		});
+	} catch (error) {
+		// More detailed error logging
+		const err = error as { message: string, code?: string, type?: string, response?: any };
+		console.error('Error details:', {
+			message: err.message,
+			code: err.code,
+			type: err.type,
+			response: err.response
+		});
 
-	res.json({
-		openai: result.text,
-		anthropic: anthropicResult.content[0]
-	});
+		res.status(500).json({ 
+			error: 'Failed to generate response',
+			details: err.message
+		});
+	}
 });
 
 app.listen(port, () => {
