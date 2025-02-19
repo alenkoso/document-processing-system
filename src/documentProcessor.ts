@@ -1,10 +1,14 @@
 import fs from 'fs/promises';
 import path from 'path';
 
-interface DocumentChunk {
+export interface DocumentChunk {
   content: string;
   index: number;
   source: string;
+  metadata?: {
+    paragraphCount: number;
+    sentenceCount: number;
+  }
 }
 
 export class DocumentProcessor {
@@ -12,77 +16,113 @@ export class DocumentProcessor {
   private maxChunkSize = 1000; // characters
   private minChunkSize = 500;  // minimum chunk size
   
+  private cleanText(text: string): string {
+    return text
+      .replace(/\s+/g, ' ')           // normalize whitespace
+      .replace(/[\r\n]+/g, '\n')      // normalize line endings
+      .replace(/\t/g, ' ')            // replace tabs with spaces
+      .trim();
+  }
+
+  private splitIntoParagraphs(text: string): string[] {
+    return text
+      .split(/\n\s*\n/)               // Split on empty lines
+      .map(p => this.cleanText(p))    // Clean each paragraph
+      .filter(p => p.length > 0);     // Remove empty paragraphs
+  }
+
+  private splitIntoSentences(text: string): string[] {
+    // Enhanced sentence splitting with abbreviation handling
+    return text
+      .split(/(?<=[.!?])\s+(?=[A-Z])/)
+      .filter(s => s.trim().length > 0)
+      .map(s => s.trim());
+  }
+
   async loadDocument(filePath: string): Promise<void> {
     const content = await fs.readFile(filePath, 'utf-8');
     const fileName = path.basename(filePath);
     
-    // Split into paragraphs first
-    const paragraphs = content
-      .split(/\n\s*\n/)  // Split on empty lines
-      .filter(p => p.trim().length > 0);  // Remove empty paragraphs
-    
+    const paragraphs = this.splitIntoParagraphs(content);
     let currentChunk = '';
     let index = 0;
+    let paragraphCount = 0;
+    let sentenceCount = 0;
     
     for (const paragraph of paragraphs) {
-      // If adding this paragraph would exceed maxChunkSize
       if (currentChunk.length + paragraph.length > this.maxChunkSize) {
-        // If we have content, save the current chunk
         if (currentChunk.length >= this.minChunkSize) {
           this.chunks.push({
             content: currentChunk.trim(),
             index: index++,
-            source: fileName
+            source: fileName,
+            metadata: {
+              paragraphCount,
+              sentenceCount
+            }
           });
           currentChunk = '';
+          paragraphCount = 0;
+          sentenceCount = 0;
         }
         
-        // If the paragraph itself is too long, split it into sentences
         if (paragraph.length > this.maxChunkSize) {
-          const sentences = paragraph
-            .split(/(?<=[.!?])\s+/)  // Split on sentence endings
-            .filter(s => s.trim().length > 0);
-          
+          const sentences = this.splitIntoSentences(paragraph);
           let sentenceChunk = '';
+          
           for (const sentence of sentences) {
             if (sentenceChunk.length + sentence.length > this.maxChunkSize) {
               if (sentenceChunk.length >= this.minChunkSize) {
                 this.chunks.push({
                   content: sentenceChunk.trim(),
                   index: index++,
-                  source: fileName
+                  source: fileName,
+                  metadata: {
+                    paragraphCount: 1,
+                    sentenceCount: this.splitIntoSentences(sentenceChunk).length
+                  }
                 });
               }
               sentenceChunk = sentence;
+              sentenceCount = 1;
             } else {
-              sentenceChunk += ' ' + sentence;
+              sentenceChunk += (sentenceChunk ? ' ' : '') + sentence;
+              sentenceCount++;
             }
           }
           
-          // Add any remaining sentences
           if (sentenceChunk.length >= this.minChunkSize) {
             this.chunks.push({
               content: sentenceChunk.trim(),
               index: index++,
-              source: fileName
+              source: fileName,
+              metadata: {
+                paragraphCount: 1,
+                sentenceCount
+              }
             });
           }
         } else {
-          // Paragraph fits in a single chunk
           currentChunk = paragraph;
+          paragraphCount = 1;
+          sentenceCount = this.splitIntoSentences(paragraph).length;
         }
       } else {
-        // Add paragraph to current chunk
         currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
+        paragraphCount++;
+        sentenceCount += this.splitIntoSentences(paragraph).length;
       }
     }
     
-    // Add final chunk if it exists
     if (currentChunk.length >= this.minChunkSize) {
       this.chunks.push({
         content: currentChunk.trim(),
         index: index,
-        source: fileName
+        source: fileName,
+        metadata: {
+          paragraphCount,
+          sentenceCount
+        }
       });
     }
   }
