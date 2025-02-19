@@ -9,7 +9,7 @@ Send a POST request to `/api/chat` with your question in the prompt field:
 ```bash
 curl -X POST http://localhost:3000/api/chat \
   -H "Content-Type: application/json" \
-  -d '{"prompt": "Your question here"}'
+  -d '{"prompt": "Your question here"}' | jq
 ```
 
 ## Example Queries
@@ -18,7 +18,7 @@ curl -X POST http://localhost:3000/api/chat \
 ```bash
 curl -X POST http://localhost:3000/api/chat \
   -H "Content-Type: application/json" \
-  -d '{"prompt": "What happens in the Flourish and Blotts scene in Harry Potter?"}'
+  -d '{"prompt": "What happens in the Flourish and Blotts scene in Harry Potter?"}' | jq
 ```
 
 ## Response Format
