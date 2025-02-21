@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Harry Potter Document Search</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 0 20px;
+            line-height: 1.6;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .search-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        #searchInput {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            border: 2px solid #eee;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+        }
+        .button-container {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        button {
+            padding: 12px 25px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        #searchButton {
+            background-color: #3498db;
+            color: white;
+        }
+        #clearButton {
+            background-color: #e74c3c;
+            color: white;
+        }
+        #loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            display: none;
+        }
+        #result {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: none;
+        }
+        .answer {
+            font-size: 16px;
+            line-height: 1.8;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        .source-list {
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+            margin-top: 15px;
+        }
+        .source-item {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin: 5px 0;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>Harry Potter Document Search</h1>
+    <div class="search-container">
+        <input type="text" 
+               id="searchInput" 
+               placeholder="Ask a question about Harry Potter..."
+               autofocus>
+        <div class="button-container">
+            <button id="clearButton">Clear</button>
+            <button id="searchButton">Search</button>
+        </div>
+    </div>
+    <div id="loading">Searching the wizarding world... 🪄</div>
+    <div id="result"></div>
+    <script src="script.js"></script>
+</body>
+</html> 
