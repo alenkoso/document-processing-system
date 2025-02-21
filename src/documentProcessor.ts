@@ -17,9 +17,9 @@ export interface DocumentChunk {
 
 export class DocumentProcessor {
   private chunks: DocumentChunk[] = [];
-  private maxChunkSize = 1000; // characters
-  private minChunkSize = 500;  // minimum chunk size
-  private maxOverlap = 100;    // maximum overlap between chunks
+  private maxChunkSize = 200;  // Reduced from 1000 for testing
+  private minChunkSize = 100;  // Reduced from 500 for testing
+  private maxOverlap = 50;     // Reduced from 100 for testing
   
   private cleanText(text: string): string {
     return text
@@ -75,94 +75,64 @@ export class DocumentProcessor {
     
     const paragraphs = this.splitIntoParagraphs(content);
     let currentChunk = '';
+    let previousChunk = '';
     let index = 0;
-    let paragraphCount = 0;
-    let sentenceCount = 0;
     
     for (const paragraph of paragraphs) {
-      if (currentChunk.length + paragraph.length > this.maxChunkSize) {
-        if (currentChunk.length >= this.minChunkSize) {
-          this.chunks.push({
-            content: currentChunk.trim(),
-            index: index++,
-            source: fileName,
-            metadata: {
-              paragraphCount,
-              sentenceCount,
-              keyTerms: [],
-              semanticScore: 0
-            }
-          });
-          currentChunk = '';
-          paragraphCount = 0;
-          sentenceCount = 0;
-        }
+      currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
+      
+      if (currentChunk.length >= this.maxChunkSize) {
+        // Create chunk with overlap from previous
+        const chunkContent = this.createOverlappingChunk(currentChunk, previousChunk);
         
-        if (paragraph.length > this.maxChunkSize) {
-          const sentences = this.splitIntoSentences(paragraph);
-          let sentenceChunk = '';
-          
-          for (const sentence of sentences) {
-            if (sentenceChunk.length + sentence.length > this.maxChunkSize) {
-              if (sentenceChunk.length >= this.minChunkSize) {
-                this.chunks.push({
-                  content: sentenceChunk.trim(),
-                  index: index++,
-                  source: fileName,
-                  metadata: {
-                    paragraphCount: 1,
-                    sentenceCount: this.splitIntoSentences(sentenceChunk).length,
-                    keyTerms: [],
-                    semanticScore: 0
-                  }
-                });
-              }
-              sentenceChunk = sentence;
-              sentenceCount = 1;
-            } else {
-              sentenceChunk += (sentenceChunk ? ' ' : '') + sentence;
-              sentenceCount++;
-            }
+        this.chunks.push({
+          content: chunkContent,
+          index: index++,
+          source: fileName,
+          metadata: {
+            paragraphCount: this.splitIntoParagraphs(chunkContent).length,
+            sentenceCount: this.splitIntoSentences(chunkContent).length,
+            keyTerms: this.extractKeyTerms(chunkContent),
+            previousChunkId: index > 0 ? index - 1 : undefined,
+            nextChunkId: undefined,
+            semanticScore: 0
           }
-          
-          if (sentenceChunk.length >= this.minChunkSize) {
-            this.chunks.push({
-              content: sentenceChunk.trim(),
-              index: index++,
-              source: fileName,
-              metadata: {
-                paragraphCount: 1,
-                sentenceCount,
-                keyTerms: [],
-                semanticScore: 0
-              }
-            });
-          }
-        } else {
-          currentChunk = paragraph;
-          paragraphCount = 1;
-          sentenceCount = this.splitIntoSentences(paragraph).length;
-        }
-      } else {
-        currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
-        paragraphCount++;
-        sentenceCount += this.splitIntoSentences(paragraph).length;
+        });
+        
+        previousChunk = currentChunk;
+        currentChunk = '';
       }
     }
     
+    // Handle remaining content
     if (currentChunk.length >= this.minChunkSize) {
+      const chunkContent = this.createOverlappingChunk(currentChunk, previousChunk);
       this.chunks.push({
-        content: currentChunk.trim(),
+        content: chunkContent,
         index: index,
         source: fileName,
         metadata: {
-          paragraphCount,
-          sentenceCount,
-          keyTerms: [],
+          paragraphCount: this.splitIntoParagraphs(chunkContent).length,
+          sentenceCount: this.splitIntoSentences(chunkContent).length,
+          keyTerms: this.extractKeyTerms(chunkContent),
+          previousChunkId: index > 0 ? index - 1 : undefined,
+          nextChunkId: undefined,
           semanticScore: 0
         }
       });
     }
+    
+    // Update nextChunkId for all chunks except the last one
+    for (let i = 0; i < this.chunks.length - 1; i++) {
+      this.chunks[i].metadata.nextChunkId = this.chunks[i + 1].index;
+    }
+  }
+
+  private extractKeyTerms(text: string): string[] {
+    return this.preprocessText(text)
+      .split(' ')
+      .filter(term => term.length > 3) // Only keep meaningful terms
+      .slice(0, 10);  // Keep top 10 terms
   }
 
   async loadDocumentsFromDirectory(dirPath: string): Promise<void> {
@@ -176,24 +146,29 @@ export class DocumentProcessor {
   }
 
   findRelevantChunks(query: string, limit: number = 3): DocumentChunk[] {
-    // Simple relevance scoring based on word matching
-    // I will improve this later with better semantic search
-    const queryWords = query.toLowerCase().split(' ');
+    const queryTerms = this.preprocessText(query).split(' ');
     
-    return this.chunks
-      .map(chunk => ({
-        chunk,
-        score: this.calculateRelevance(chunk.content, queryWords)
-      }))
+    // Calculate TF-IDF scores
+    const scores = this.chunks.map(chunk => {
+      const chunkTerms = this.preprocessText(chunk.content).split(' ');
+      let score = 0;
+      
+      for (const term of queryTerms) {
+        const tf = chunkTerms.filter(t => t === term).length / chunkTerms.length;
+        const df = this.chunks.filter(c => 
+          this.preprocessText(c.content).includes(term)
+        ).length;
+        const idf = Math.log(this.chunks.length / (df || 1));
+        
+        score += tf * idf;
+      }
+      
+      return { chunk, score };
+    });
+    
+    return scores
       .sort((a, b) => b.score - a.score)
       .slice(0, limit)
       .map(item => item.chunk);
-  }
-
-  private calculateRelevance(content: string, queryWords: string[]): number {
-    const contentLower = content.toLowerCase();
-    return queryWords.reduce((score, word) => {
-      return score + (contentLower.includes(word) ? 1 : 0);
-    }, 0);
   }
 } 
