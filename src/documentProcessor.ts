@@ -5,9 +5,13 @@ export interface DocumentChunk {
   content: string;
   index: number;
   source: string;
-  metadata?: {
+  metadata: {
     paragraphCount: number;
     sentenceCount: number;
+    previousChunkId?: number;
+    nextChunkId?: number;
+    keyTerms: string[];
+    semanticScore?: number;
   }
 }
 
@@ -15,6 +19,7 @@ export class DocumentProcessor {
   private chunks: DocumentChunk[] = [];
   private maxChunkSize = 1000; // characters
   private minChunkSize = 500;  // minimum chunk size
+  private maxOverlap = 100;    // maximum overlap between chunks
   
   private cleanText(text: string): string {
     return text
@@ -39,6 +44,31 @@ export class DocumentProcessor {
       .map(s => s.trim());
   }
 
+  private preprocessText(text: string): string {
+    return text
+      .toLowerCase()
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, ' ')  // Remove punctuation
+      .replace(/\s+/g, ' ')                           // Normalize whitespace
+      .trim()
+      .split(' ')
+      .filter(word => word.length > 2)                // Remove short words
+      .join(' ');
+  }
+
+  private createOverlappingChunk(
+    content: string, 
+    previousChunk?: string
+  ): string {
+    if (!previousChunk) return content;
+    
+    const overlap = previousChunk.slice(-this.maxOverlap);
+    const overlapIndex = content.indexOf(overlap);
+    
+    return overlapIndex > -1 ? 
+      content.slice(overlapIndex + overlap.length) : 
+      content;
+  }
+
   async loadDocument(filePath: string): Promise<void> {
     const content = await fs.readFile(filePath, 'utf-8');
     const fileName = path.basename(filePath);
@@ -58,7 +88,9 @@ export class DocumentProcessor {
             source: fileName,
             metadata: {
               paragraphCount,
-              sentenceCount
+              sentenceCount,
+              keyTerms: [],
+              semanticScore: 0
             }
           });
           currentChunk = '';
@@ -79,7 +111,9 @@ export class DocumentProcessor {
                   source: fileName,
                   metadata: {
                     paragraphCount: 1,
-                    sentenceCount: this.splitIntoSentences(sentenceChunk).length
+                    sentenceCount: this.splitIntoSentences(sentenceChunk).length,
+                    keyTerms: [],
+                    semanticScore: 0
                   }
                 });
               }
@@ -98,7 +132,9 @@ export class DocumentProcessor {
               source: fileName,
               metadata: {
                 paragraphCount: 1,
-                sentenceCount
+                sentenceCount,
+                keyTerms: [],
+                semanticScore: 0
               }
             });
           }
@@ -121,7 +157,9 @@ export class DocumentProcessor {
         source: fileName,
         metadata: {
           paragraphCount,
-          sentenceCount
+          sentenceCount,
+          keyTerms: [],
+          semanticScore: 0
         }
       });
     }
