@@ -1,18 +1,36 @@
 import express from "express";
 import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
-import { Anthropic } from "@anthropic-ai/sdk";
 import dotenv from "dotenv";
 import { DocumentProcessor } from './documentProcessor';
 import path from 'path';
+import fs from 'fs';
 
 dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Adding this due to docker compose not being able to find the documents folder
+const DOCUMENTS_PATH = process.env.DOCUMENTS_PATH || path.join(process.cwd(), 'documents');
+
+// Middleware
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve static files from the public directory
+app.use(express.static(path.join(__dirname, 'public'), {
+	setHeaders: (res, path) => {
+		if (path.endsWith('.js')) {
+			res.setHeader('Content-Type', 'application/javascript');
+		}
+	}
+}));
+
+// Debug logging
+console.log('Static file paths:', {
+	dirname: __dirname,
+	publicPath: path.join(__dirname, 'public')
+});
 
 app.use((req, res, next) => {
 	console.log('Request URL:', req.url);
@@ -26,21 +44,22 @@ const openai = createOpenAI({
 // Did the API key load?
 console.log('API Key loaded:', process.env.OPENAI_API_KEY ? 'Yes' : 'No');
 
-const anthropic = new Anthropic({
-	apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
 const documentProcessor = new DocumentProcessor();
 
 // Load documents when server starts
 (async () => {
 	try {
-		await documentProcessor.loadDocumentsFromDirectory(
-			path.join(__dirname, 'documents')
-		);
+		console.log('Attempting to load documents from:', DOCUMENTS_PATH);
+		await documentProcessor.loadDocumentsFromDirectory(DOCUMENTS_PATH);
 		console.log('Documents loaded successfully');
-	} catch (error) {
-		console.error('Failed to load documents:', error);
+	} catch (err) {
+		const error = err as Error;
+		console.error('Failed to load documents:', error.message);
+		console.error('Error details:', {
+			name: error.name,
+			message: error.message,
+			stack: error.stack
+		});
 	}
 })();
 
@@ -91,7 +110,3 @@ app.post("/api/chat", async (req, res) => {
 app.listen(port, () => {
 	console.log(`Server running on port ${port}`);
 });
-
-// curl -X POST http://localhost:3000/api/chat \
-// -H "Content-Type: application/json" \
-// -d '{"prompt": "What happens in the Flourish and Blotts scene in Harry Potter?"}'
