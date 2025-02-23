@@ -6,6 +6,7 @@ import { logger } from './utils/logger';
 import { DocumentProcessor } from './documentProcessor';
 import { apiLimiter } from './middleware/rateLimit';
 import path from 'path';
+import { monitorRequest } from "./middleware/monitoring";
 
 const app = express();
 const port = config.PORT;
@@ -13,15 +14,36 @@ const port = config.PORT;
 app.use(express.json());
 app.use('/api', apiLimiter);
 
+// Add monitoring middleware
+app.use(monitorRequest);
+
+// Add memory usage monitoring
+setInterval(() => {
+  const used = process.memoryUsage();
+  logger.info('Memory usage', {
+    rss: `${Math.round(used.rss / 1024 / 1024)}MB`,
+    heapTotal: `${Math.round(used.heapTotal / 1024 / 1024)}MB`,
+    heapUsed: `${Math.round(used.heapUsed / 1024 / 1024)}MB`,
+    external: `${Math.round(used.external / 1024 / 1024)}MB`
+  });
+}, 30000);
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Health check endpoint
 app.get('/health', (_, res) => {
-	res.json({
+	const healthInfo = {
 		status: 'ok',
 		timestamp: new Date().toISOString(),
-		version: process.env.npm_package_version
-	});
+		version: process.env.npm_package_version,
+		uptime: process.uptime(),
+		memory: process.memoryUsage(),
+		documents: {
+			count: documentProcessor.getDocumentCount(),
+			chunks: documentProcessor.getChunkCount()
+		}
+	};
+	res.json(healthInfo);
 });
 
 const openai = createOpenAI({

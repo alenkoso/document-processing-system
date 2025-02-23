@@ -17,6 +17,7 @@ export interface DocumentChunk {
 
 export class DocumentProcessor {
   private chunks: DocumentChunk[] = [];
+  private documents: Set<string> = new Set();
   private maxChunkSize = 1000; // characters
   private minChunkSize = 500;  // minimum chunk size
   private maxOverlap = 100;    // maximum overlap between chunks
@@ -70,6 +71,7 @@ export class DocumentProcessor {
   }
 
   async loadDocument(filePath: string): Promise<void> {
+    this.documents.add(path.basename(filePath));
     const content = await fs.readFile(filePath, 'utf-8');
     const fileName = path.basename(filePath);
     
@@ -195,5 +197,13 @@ export class DocumentProcessor {
     return queryWords.reduce((score, word) => {
       return score + (contentLower.includes(word) ? 1 : 0);
     }, 0);
+  }
+
+  getDocumentCount(): number {
+    return this.documents.size;
+  }
+
+  getChunkCount(): number {
+    return this.chunks.length;
   }
 } 
