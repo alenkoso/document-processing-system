@@ -1,31 +1,124 @@
-# Backend Challenge: Document Q&A System
+# Prerequisites
+- Docker and Docker Compose
+- Node.js v20+ (for local development)
+- pnpm (for local development)
 
-## Overview
-Build a production-ready system that enables users to query documents of any size and receive accurate, contextually relevant answers. Your solution should demonstrate strong engineering practices and handle documents that exceed typical LLM context windows.
+# Docker Setup (Recommended)
+1. Create `.env` file:
+```env
+OPENAI_API_KEY=<your_key_here>
+```
+2. Add any additional documents to `src/documents/` (*.txt files)
 
-## The Challenge
-Implement an endpoint that allows users to query document content effectively. Focus on building a robust, production-ready solution that demonstrates your engineering judgment.
+3. Run:
+```bash
+docker-compose up --build
+```
 
-## Current Implementation
-- Basic Express server setup
-- Endpoint structure 
-- Test documents in `src/documents/`
+4. Open your browser and navigate to `http://localhost:3000`
 
-## Getting Started
+-------------------------------------------------------------------------------------
 
+## Local Development
 1. Install dependencies:
 ```bash
 pnpm install
 ```
 
-2. Create `.env` file with required API keys
+2. Create `.env` file (same as above)
 
-3. Run development server:
+3. Run:
 ```bash
 pnpm run dev
 ```
 
-## Test Documents
-The `src/documents/` folder contains sample documents for validating your implementation. Your solution should handle these effectively while maintaining performance and reliability.
 
-Focus on demonstrating your ability to build reliable, production-ready systems. Show us how you think about engineering challenges and make technical decisions.
+### Troubleshooting
+- Check Docker logs: `docker-compose logs app`
+- Verify documents in `src/documents/`
+- Ensure OPENAI_API_KEY is set correctly
+
+
+
+-------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------
+
+# How to Query the API
+
+This document explains how to interact with the chat API endpoint.
+
+## Basic Usage
+
+Send a POST request to `/api/chat` with your question in the prompt field:
+
+```bash
+curl -X POST http://localhost:3000/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Your question here"}' | jq
+```
+
+### Example Queries
+
+1. Basic question:
+```bash
+curl -X POST http://localhost:3000/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "What happens in the Flourish and Blotts scene in Harry Potter?"}' | jq
+```
+
+### Response Format
+
+The API returns JSON with the following structure:
+
+```json
+{
+  "answer": "The AI-generated answer to your question",
+  "context": [
+    {
+      "source": "filename.txt",
+      "index": 1
+    }
+  ]
+}
+```
+
+- `answer`: The generated response to your question
+- `context`: Array of document chunks used to generate the answer
+  - `source`: The source document name
+  - `index`: The chunk index in the document
+
+### Error Responses
+
+If an error occurs, you'll receive a response with a 500 status code:
+
+```json
+{
+  "error": "Failed to generate response",
+  "details": "Specific error message"
+}
+```
+
+-------------------------------------------------------------------------------------
+
+
+
+-------------------------------------------------------------------------------------
+
+# Monitoring
+
+1. View health status and metrics:
+```bash
+curl http://localhost:3000/health
+```
+
+2. Monitor logs in real-time:
+```bash
+docker-compose logs -f app
+```
+
+3. Available Metrics:
+- Memory usage (30s intervals)
+- Request timing and status
+- Document processing stats
+- System uptime
+- API response times
