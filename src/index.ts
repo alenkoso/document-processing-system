@@ -1,76 +1,75 @@
 import express from "express";
 import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
-import dotenv from "dotenv";
+import { config } from './config';
+import { logger } from './utils/logger';
 import { DocumentProcessor } from './documentProcessor';
+import { apiLimiter } from './middleware/rateLimit';
 import path from 'path';
-import fs from 'fs';
-
-dotenv.config();
+import { monitorRequest } from "./middleware/monitoring";
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = config.PORT;
 
-// Adding this due to docker compose not being able to find the documents folder
-const DOCUMENTS_PATH = process.env.DOCUMENTS_PATH || path.join(process.cwd(), 'documents');
-
-// Middleware
 app.use(express.json());
+app.use('/api', apiLimiter);
 
-// Serve static files from the public directory
-app.use(express.static(path.join(__dirname, 'public'), {
-	setHeaders: (res, path) => {
-		if (path.endsWith('.js')) {
-			res.setHeader('Content-Type', 'application/javascript');
+// Add monitoring middleware
+app.use(monitorRequest);
+
+// Add memory usage monitoring
+setInterval(() => {
+  const used = process.memoryUsage();
+  logger.info('Memory usage', {
+    rss: `${Math.round(used.rss / 1024 / 1024)}MB`,
+    heapTotal: `${Math.round(used.heapTotal / 1024 / 1024)}MB`,
+    heapUsed: `${Math.round(used.heapUsed / 1024 / 1024)}MB`,
+    external: `${Math.round(used.external / 1024 / 1024)}MB`
+  });
+}, 30000);
+
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Health check endpoint
+app.get('/health', (_, res) => {
+	const healthInfo = {
+		status: 'ok',
+		timestamp: new Date().toISOString(),
+		version: process.env.npm_package_version,
+		uptime: process.uptime(),
+		memory: process.memoryUsage(),
+		documents: {
+			count: documentProcessor.getDocumentCount(),
+			chunks: documentProcessor.getChunkCount()
 		}
-	}
-}));
-
-// Debug logging
-console.log('Static file paths:', {
-	dirname: __dirname,
-	publicPath: path.join(__dirname, 'public')
-});
-
-app.use((req, res, next) => {
-	console.log('Request URL:', req.url);
-	next();
+	};
+	res.json(healthInfo);
 });
 
 const openai = createOpenAI({
-	apiKey: process.env.OPENAI_API_KEY,
+	apiKey: config.OPENAI_API_KEY,
 });
-
-// Did the API key load?
-console.log('API Key loaded:', process.env.OPENAI_API_KEY ? 'Yes' : 'No');
 
 const documentProcessor = new DocumentProcessor();
 
 // Load documents when server starts
 (async () => {
 	try {
-		console.log('Attempting to load documents from:', DOCUMENTS_PATH);
-		await documentProcessor.loadDocumentsFromDirectory(DOCUMENTS_PATH);
-		console.log('Documents loaded successfully');
-	} catch (err) {
-		const error = err as Error;
-		console.error('Failed to load documents:', error.message);
-		console.error('Error details:', {
-			name: error.name,
-			message: error.message,
-			stack: error.stack
+		logger.info('Loading documents from:', { path: config.DOCUMENTS_PATH });
+		await documentProcessor.loadDocumentsFromDirectory(config.DOCUMENTS_PATH);
+		logger.info('Documents loaded successfully');
+	} catch (error) {
+		logger.error('Failed to load documents:', {
+			error: error instanceof Error ? error.message : String(error)
 		});
 	}
 })();
 
 app.post("/api/chat", async (req, res) => {
 	try {
-		const { prompt = "What is the capital of the moon?" } = req.body;
-
-		// Find relevant document chunks
+		const { prompt } = req.body;
 		const relevantChunks = documentProcessor.findRelevantChunks(prompt);
 		
-		// Create a prompt that includes the relevant context
 		const contextualPrompt = `
 			Based on the following context:
 			${relevantChunks.map(chunk => chunk.content).join('\n\n')}
@@ -92,21 +91,31 @@ app.post("/api/chat", async (req, res) => {
 			}))
 		});
 	} catch (error) {
-		const err = error as { message: string, code?: string, type?: string, response?: any };
-		console.error('Error details:', {
-			message: err.message,
-			code: err.code,
-			type: err.type,
-			response: err.response
+		logger.error('Chat API error:', {
+			error: error instanceof Error ? error.message : String(error)
 		});
-
+		
 		res.status(500).json({ 
 			error: 'Failed to generate response',
-			details: err.message
+			details: error instanceof Error ? error.message : 'Unknown error'
 		});
 	}
 });
 
-app.listen(port, () => {
-	console.log(`Server running on port ${port}`);
+// Root route
+app.get('/', (_, res) => {
+	res.sendFile(path.join(__dirname, 'public/index.html'));
+});
+
+const server = app.listen(port, () => {
+	logger.info(`Server running on port ${port}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+	logger.info('SIGTERM received. Starting graceful shutdown');
+	server.close(() => {
+		logger.info('Server closed');
+		process.exit(0);
+	});
 });

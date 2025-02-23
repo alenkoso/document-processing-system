@@ -1,9 +1,9 @@
-## Prerequisites
+# Prerequisites
 - Docker and Docker Compose
 - Node.js v20+ (for local development)
 - pnpm (for local development)
 
-## Docker Setup (Recommended)
+# Docker Setup (Recommended)
 1. Create `.env` file:
 ```env
 OPENAI_API_KEY=<your_key_here>
@@ -33,7 +33,7 @@ pnpm run dev
 ```
 
 
-## Troubleshooting
+### Troubleshooting
 - Check Docker logs: `docker-compose logs app`
 - Verify documents in `src/documents/`
 - Ensure OPENAI_API_KEY is set correctly
@@ -57,7 +57,7 @@ curl -X POST http://localhost:3000/api/chat \
   -d '{"prompt": "Your question here"}' | jq
 ```
 
-## Example Queries
+### Example Queries
 
 1. Basic question:
 ```bash
@@ -66,7 +66,7 @@ curl -X POST http://localhost:3000/api/chat \
   -d '{"prompt": "What happens in the Flourish and Blotts scene in Harry Potter?"}' | jq
 ```
 
-## Response Format
+### Response Format
 
 The API returns JSON with the following structure:
 
@@ -87,7 +87,7 @@ The API returns JSON with the following structure:
   - `source`: The source document name
   - `index`: The chunk index in the document
 
-## Error Responses
+### Error Responses
 
 If an error occurs, you'll receive a response with a 500 status code:
 
@@ -97,3 +97,28 @@ If an error occurs, you'll receive a response with a 500 status code:
   "details": "Specific error message"
 }
 ```
+
+-------------------------------------------------------------------------------------
+
+
+
+-------------------------------------------------------------------------------------
+
+# Monitoring
+
+1. View health status and metrics:
+```bash
+curl http://localhost:3000/health
+```
+
+2. Monitor logs in real-time:
+```bash
+docker-compose logs -f app
+```
+
+3. Available Metrics:
+- Memory usage (30s intervals)
+- Request timing and status
+- Document processing stats
+- System uptime
+- API response times

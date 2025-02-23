@@ -1,54 +1,41 @@
 # Build stage
 FROM node:20-alpine as builder
-
+RUN apk update && apk upgrade
 WORKDIR /app
-
-# Install pnpm
-RUN npm install -g pnpm
-
-# Copy package files
+RUN npm install -g pnpm@8.15.1
 COPY package.json pnpm-lock.yaml ./
-
-# Install dependencies with node-linker=hoisted
 RUN pnpm install --node-linker=hoisted
 
-# Copy source code and public files
 COPY src ./src
 COPY tsconfig.json ./
 
-# Ensure public directory exists in src
+# Ensure public directory exists and is copied
 RUN mkdir -p src/public
+COPY src/public ./src/public
 
-# Build the application
 RUN pnpm run build
-
-# Copy public files to dist/public
 RUN cp -r src/public dist/
 
-# Production stage
 FROM node:20-alpine
+
+RUN apk update && apk upgrade && \
+    addgroup -S appgroup && adduser -S appuser -G appgroup
 
 WORKDIR /app
 
-# Install pnpm and debugging tools
-RUN npm install -g pnpm && \
-    apk add --no-cache tree
-
-# Copy built assets and public files
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/pnpm-lock.yaml ./
-COPY --from=builder /app/src/public ./dist/public
 
-# Create documents directory
-RUN mkdir -p documents
+RUN npm install -g pnpm@8.15.1 && \
+    pnpm install --frozen-lockfile --prod --node-linker=hoisted && \
+    mkdir -p documents && \
+    chown -R appuser:appgroup /app
 
-# Install production dependencies
-RUN pnpm install --prod --node-linker=hoisted
+USER appuser
 
-# Add debugging command to startup
-CMD echo "Container starting..." && \
-    echo "Directory structure:" && \
-    tree /app && \
-    echo "Starting server..." && \
-    node dist/index.js 
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+
+# Start the application
+CMD ["node", "dist/index.js"] 
